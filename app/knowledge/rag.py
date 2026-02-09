@@ -1,10 +1,11 @@
 from openai import OpenAI
 from app.knowledge.retriever import retrieve_context
 from app.knowledge.retriever import get_trustpartners_collection
+from app.knowledge.guardrails import is_disallowed_question, guardrail_response
 
 client = OpenAI()
 
-# Permanent Company Context
+# Trust Partners Company Context
 COMPANY_CONTEXT = """
 You are an AI assistant for Trust Partners, a Singapore-based professional services firm.
 
@@ -33,6 +34,9 @@ Behavior Rules:
 """
 
 def chat_with_knowledge(question: str) -> str:
+    if is_disallowed_question(question):
+        return guardrail_response()
+    
     collection = get_trustpartners_collection()
     context = retrieve_context(collection, question)
 
