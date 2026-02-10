@@ -10,5 +10,5 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    answer = chat_with_knowledge(req.question)
+    answer = await chat_with_knowledge(req.question)
     return {"answer": answer}

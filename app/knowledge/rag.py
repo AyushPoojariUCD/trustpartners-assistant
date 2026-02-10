@@ -1,12 +1,10 @@
-from openai import OpenAI
-from app.knowledge.retriever import retrieve_context
-from app.knowledge.retriever import get_trustpartners_collection
+from agents import Agent, Runner
+from app.knowledge.retriever import retrieve_context, get_trustpartners_collection
 from app.knowledge.guardrails import is_disallowed_question, guardrail_response
 
-client = OpenAI()
 
 # Trust Partners Company Context
-COMPANY_CONTEXT = """
+TRUST_PARTNERS_CONTEXT = """
 You are an AI assistant for Trust Partners, a Singapore-based professional services firm.
 
 Company Name:
@@ -33,30 +31,38 @@ Behavior Rules:
 - If information is not known, respond cautiously
 """
 
-def chat_with_knowledge(question: str) -> str:
+
+# Trust Partners Agent
+trustpartners_agent = Agent(
+    name="TrustPartnersAssistant",
+    instructions=TRUST_PARTNERS_CONTEXT,
+    model="gpt-4o-mini"
+)
+
+
+# Agent-powered RAG chat
+async def chat_with_knowledge(question: str) -> str:
+    # Guardrail check
     if is_disallowed_question(question):
         return guardrail_response()
-    
+
+    # Retrieve RAG context
     collection = get_trustpartners_collection()
     context = retrieve_context(collection, question)
 
-    prompt = f"""
-            {COMPANY_CONTEXT}
+    # Inject retrieved knowledge into agent input
+    agent_input = f"""
+                    Retrieved Knowledge (if relevant):
+                    {context if context.strip() else "No specific retrieved context."}
 
-            Retrieved Knowledge (if relevant):
-            {context if context.strip() else "No specific retrieved context."}
+                    User Question:
+                    {question}
+                """
 
-            User Question:
-            {question}
-        """
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": COMPANY_CONTEXT},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.2
+    # Run agent
+    result = await Runner.run(
+        trustpartners_agent,
+        agent_input,
     )
 
-    return response.choices[0].message.content
+    return result.final_output
